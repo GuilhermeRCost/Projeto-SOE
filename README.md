@@ -1,0 +1,3 @@
+Uso de interpretador de voz embarcado em \textit{Raspberry PI} para atendimento  de pessoas com deficiência visual em redes de fastfood
+
+Este projeto apresenta o desenvolvimento de um sistema embarcado utilizando um Raspberry Pi 4, que emprega um interpretador de voz baseado em Automatic Speech Recognition(ASR) para o atendimento de clientes por meio da conversa do usuário com o sistema. O objetivo  ́e melhorar a experiencia do atendimento eletrˆonico em redes de fastFodd para usu ́arios com deficiência visual ou que tenham dificuldade com tecnologia. Ao integrar o sistema de ASR nas unidades de autoatendimento o usuário seria capaz de trata-las como assistentes virtuais, em que eles realizariam os seus pedidos por meio de uma conversa.
