@@ -3,7 +3,11 @@ import pyttsx3
 def cria_audio(audio):
     engine = pyttsx3.init()
     engine.setProperty('language', 'pt-BR')
-    engine.setProperty('rate', 200)
+    voices = engine.getProperty('voices')
+    # for voice in voices:
+    #     print(voice.id)
+        
+    engine.setProperty('rate', 120)
     engine.say(audio)
     engine.runAndWait()
 

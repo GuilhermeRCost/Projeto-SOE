@@ -1,9 +1,10 @@
 import speech_recognition as sr
+import pyaudio
 
 def ouvir_Microfone():
     microfone = sr.Recognizer()
 
-    with sr.Microphone() as source:
+    with sr.Microphone(3) as source:
         microfone.adjust_for_ambient_noise(source)
         print("fala alguma coisa ...")
         audio = microfone.listen(source)
@@ -11,7 +12,7 @@ def ouvir_Microfone():
     try:
         frase = microfone.recognize_google(audio, language='pt-BR')
 
-        print("Voce disse " + frase)
+        print("Voce disse: " + frase)
     except sr.UnknownValueError:
         print("Não entendi")
 
