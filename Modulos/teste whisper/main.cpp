@@ -8,6 +8,7 @@
 #include <cctype> 
 #include <thread>
 #include <semaphore.h>
+#include <bitset>
 
 #define WHISPER_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/"
 #define MODELS_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/models/"
@@ -25,6 +26,25 @@
 
 using std::system, std::string;
 
+typedef union Word_file_info {
+    struct {
+        uint8_t error : 1;
+        uint8_t no_response : 1;
+        uint8_t word_found : 1;
+        uint8_t reserved : 5;  // Reserved bits to make up the rest of the byte
+    } bits;
+    uint8_t byte;  // Access the whole byte
+
+        // Default constructor initializes to 0
+    Word_file_info() : byte(0) {}
+
+    // Parameterized constructor to initialize bits with a given uint8_t value
+    Word_file_info(uint8_t value) {
+        byte = value & 0x07; // Use bitmask to ensure bits 3-7 are 0
+    }
+
+} wfi_t;
+
 sem_t semaphore;
 
 const string MODEL = string(MODELS_DIR) + string(MODEL_BIN_FILE);
@@ -33,7 +53,8 @@ const string WHISPER_TRANSCRIBE_AUDIO_COMMAND =
     " -m " + MODEL + 
     " -f " + string(OUTPUT_WAV_FILE) + 
     " -l " + string(LANG) + 
-    " --output-txt true -of " + string(OUTPUT_TXT_FILE_NAME);
+    " --output-txt true -of " + string(OUTPUT_TXT_FILE_NAME) +
+    " --no-prints";
 
 // const string RECORD_AUDIO_COMMAND =  
 //     "arecord -D " + string(RECORD_AUDIO_INPUT) +
@@ -41,8 +62,9 @@ const string WHISPER_TRANSCRIBE_AUDIO_COMMAND =
 //     string(OUTPUT_WAV_FILE) +
 //     " -d " + std::to_string(RECORD_TIME);
 
-bool find_word_in_file(string word){
-    std::string filename = "output.txt";
+
+uint8_t find_word_in_file(string word){
+    string filename = string(OUTPUT_TXT_FILE_NAME) + ".txt";
     std::ifstream file(filename);
 
     if (!file.is_open()) {
@@ -50,30 +72,46 @@ bool find_word_in_file(string word){
         return 1;
     } 
 
+    Word_file_info res(0);
+
     std::string line;
     int found_at = 0;
+    bool word_found = false;
+    bool no_response = true;
 
     while (std::getline(file, line)) {
+        std::cout << line << std::endl;
+        int brakets = line.find(']');
+        std::cout << "brakets = " << brakets << std::endl;
+        if(brakets > 0) {
+            std::cout << "O usuário não disse nada nesta linha" << std::endl;
+            res.bits.no_response = true;
+            continue;
+        }
         // Convert the string to lowercase
         std::transform(line.begin(), line.end(), line.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-        std::cout << line << std::endl;
-
         // Use std::istringstream to break the line into words
         found_at = line.find(word);
-    }
 
-    bool found = false;
-    if (found_at>0) {
-        std::cout << "The word was found in the file." << std::endl;
-        found = true;
-    } else {
-        std::cout << "The word was not found in the file." << std::endl;
+        if (found_at>0) {
+            std::cout << "The word was found in the file." << std::endl;
+            word_found = true;
+            no_response = false;
+            break;
+        } else {
+            std::cout << "The word was not found in this line.[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]" << std::endl;
+            no_response = false;
+        }
     }
+    
+    res.bits.error = 0;
+    res.bits.no_response = no_response;
+    res.bits.word_found = word_found;
 
     file.close();
-    return found;
+    return res.byte;
 }
 
 void textToSpeech(std::string speech)
@@ -117,32 +155,40 @@ int main() {
     std::thread messageThread(pls_wait_message); // Start the thread
 
     std::unordered_map<std::string, int> menu = {
-        {"hamburger", 1},
-        {"x burger", 2},
+        {"hambúrguer", 1},
+        {"cheeseburger", 2},
         {"coca", 3},
         {"batata", 4},
         {"combo 1", 5},
         {"combo 2", 6}
     };
 
+    wfi_t word_info;
+
     textToSpeech("Olá, você dejesa fazer um pedido?");
     record_and_transcribe(3);
-    bool word_found = find_word_in_file("não");
-    if (word_found) return 0;
+    word_info.byte = find_word_in_file("não");
+
+    std::bitset<8> x(word_info.byte);
+    std::cout << x << '\n\n';
+
+    if (word_info.bits.word_found) return 0;
+    if (word_info.bits.error) return -1;
+    if (word_info.bits.no_response) return 0;
 
     char c;
     while (true) {
 
-        std::cout << "Deseja continuar? (s, n)" << std::endl;
-        std::cin >> c;
-        if (c == 'N' || c == 'n') return 0;
-        std::cin.ignore(); // Clear the newline character from the buffer
+        textToSpeech("Qual eh o seu pedido?");
+        record_and_transcribe(6);
+        word_info.byte = find_word_in_file("hamburger");
+        if (word_info.bits.error) return -1;
+        if (word_info.bits.no_response) {
+            std::cout << "No response from user" << std::endl;
+        }
+
+        return 0;
     }
-
-    messageThread.join(); // Wait for the thread to finish (not reached in this example)
-    sem_destroy(&semaphore); // Clean up the semaphore
-
-    find_word_in_file("pizza");
 
     return 0;
 
