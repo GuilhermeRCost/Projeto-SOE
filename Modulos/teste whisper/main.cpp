@@ -9,6 +9,8 @@
 #include <thread>
 #include <semaphore.h>
 #include <bitset>
+#include <atomic>
+
 
 #define WHISPER_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/"
 #define MODELS_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/models/"
@@ -101,7 +103,7 @@ uint8_t find_word_in_file(string word){
             no_response = false;
             break;
         } else {
-            std::cout << "The word was not found in this line.[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]" << std::endl;
+            std::cout << "The word was not found in this line." << std::endl;
             no_response = false;
         }
     }
@@ -141,8 +143,8 @@ const string RECORD_AUDIO_COMMAND =
 }
 
 // Function that the thread will execute
-void pls_wait_message() {
-    while(true){
+void pls_wait_message(std::atomic<bool>& runFlag) {
+    while(runFlag){
         sem_wait(&semaphore);
         textToSpeech("Por favor, aguarde alguns instantes.");
     }
@@ -151,8 +153,9 @@ void pls_wait_message() {
 
 int main() {
 
+    std::atomic<bool> runFlag(true);
     sem_init(&semaphore, 0, 0); // Initialize the semaphore with value 1
-    std::thread messageThread(pls_wait_message); // Start the thread
+    std::thread messageThread(pls_wait_message, std::ref(runFlag)); // Start the thread
 
     std::unordered_map<std::string, int> menu = {
         {"hambúrguer", 1},
@@ -166,30 +169,65 @@ int main() {
     wfi_t word_info;
 
     textToSpeech("Olá, você dejesa fazer um pedido?");
-    record_and_transcribe(3);
+    record_and_transcribe(5);
     word_info.byte = find_word_in_file("não");
 
     std::bitset<8> x(word_info.byte);
-    std::cout << x << '\n\n';
+    std::cout << x << "\n\n";
 
-    if (word_info.bits.word_found) return 0;
-    if (word_info.bits.error) return -1;
-    if (word_info.bits.no_response) return 0;
+    if (word_info.bits.word_found || word_info.bits.no_response) goto terminate;
+    if (word_info.byte == 1) goto terminate_with_errors;
 
     char c;
     while (true) {
 
-        textToSpeech("Qual eh o seu pedido?");
+        textToSpeech("Qual é o seu pedido?");
         record_and_transcribe(6);
-        word_info.byte = find_word_in_file("hamburger");
-        if (word_info.bits.error) return -1;
-        if (word_info.bits.no_response) {
-            std::cout << "No response from user" << std::endl;
+        for (const auto& pair : menu) {
+            std::cout << "Key: " << pair.first << std::endl;
+            word_info.byte = find_word_in_file(pair.first);
+            if (word_info.bits.error) goto terminate_with_errors;
+            if (word_info.bits.no_response) {
+                std::cout << "No response from user" << std::endl;
+                break;
+            }
+            if (word_info.bits.word_found){
+                string text = "Você pediu " + pair.first;
+                textToSpeech(text);
+                goto terminate;
+            }
         }
+        
+        textToSpeech("Não temos essa opção");
 
-        return 0;
+        break;
     }
 
+    terminate:
+    // Signal the thread to stop
+    runFlag = false;
+    sem_post(&semaphore);
+
+    // Wait for the thread to finish
+    messageThread.join();
+    sem_destroy(&semaphore);
+
+    textToSpeech("Obrigado por escolher nosso restaurante. Daqui a pouco sua comida estará pronta!");
+
+    std::cout << "Terminated with no errors" << std::endl;
     return 0;
+
+    terminate_with_errors:
+    // Signal the thread to stop
+    runFlag = false;
+    sem_post(&semaphore);
+
+    // Wait for the thread to finish
+    messageThread.join();
+    sem_destroy(&semaphore);
+
+    std::cout << "Terminated with errors" << std::endl;
+
+    return -1;
 
 }
