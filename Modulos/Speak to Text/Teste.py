@@ -1,30 +1,23 @@
 import speech_recognition as sr
-import pyaudio
-
-def ouvir_Microfone():
+#Funcao responsavel por ouvir e reconhecer a fala
+def ouvir_microfone():
+ #Habilita o microfone para ouvir o usuario
     microfone = sr.Recognizer()
-
-    with sr.Microphone(3) as source:
+    with sr.Microphone() as source:
+  #Chama a funcao de reducao de ruido disponivel na speech_recognition
         microfone.adjust_for_ambient_noise(source)
-        print("fala alguma coisa ...")
+  #Avisa ao usuario que esta pronto para ouvir
+        print("Diga alguma coisa: ")
+  #Armazena a informacao de audio na variavel
         audio = microfone.listen(source)
+        try:
+    #Passa o audio para o reconhecedor de padroes do speech_recognition
+            frase = microfone.(audio,language='pt-BR')
+    #Ap�s alguns segundos, retorna a frase falada
+            print("Voc� disse: " + frase)
+        #Caso nao tenha reconhecido o padrao de fala, exibe esta mensagem
+        except:
+                print("N�o entendi")
+        return frase
 
-    try:
-        frase = microfone.recognize_google(audio, language='pt-BR')
-
-        print("Voce disse: " + frase)
-    except sr.UnknownValueError:
-        print("Não entendi")
-
-while True:
-    ouvir_Microfone()
-    continuar = str(input("Deseja continuar? ")).upper()[0]
-
-    if continuar == "S":
-        continue
-    elif continuar == "N":
-        break
-    else:
-        print("Comando invalido")
-
-    
+ouvir_microfone()
