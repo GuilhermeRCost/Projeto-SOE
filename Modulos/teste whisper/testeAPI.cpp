@@ -11,6 +11,8 @@
 #include <wiringPi.h>
 #include <bitset>
 #include <atomic>
+#include <curl/curl.h>
+#include <json/json.h>
 
 
 #define WHISPER_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/"
@@ -147,7 +149,7 @@ const string RECORD_AUDIO_COMMAND =
 void pls_wait_message(std::atomic<bool>& runFlag) {
     while(runFlag){
         sem_wait(&semaphore);
-        if(runFlag) textToSpeech("Por favor, aguarde alguns instantes.");
+        textToSpeech("Por favor, aguarde alguns instantes.");
 
     }
 }
@@ -169,12 +171,12 @@ int main() {
     std::thread messageThread(pls_wait_message, std::ref(runFlag)); // Start the thread
 
     std::unordered_map<std::string, int> menu = {
-        {"hambúrguer", 15},
-        {"cheeseburger", 20},
-        {"coca", 6},
-        {"batata", 5},
-        {"combo 1", 20},
-        {"combo 2", 25}
+        {"hambúrguer", 1},
+        {"cheeseburger", 2},
+        {"coca", 3},
+        {"batata", 4},
+        {"combo 1", 5},
+        {"combo 2", 6}
     };
 
     wfi_t word_info;
@@ -196,27 +198,30 @@ int main() {
             if (word_info.bits.word_found || word_info.bits.no_response) goto terminate;
             if (word_info.byte == 1) goto terminate_with_errors;
 
-            textToSpeech("Qual é o seu pedido?");
-            record_and_transcribe(6);
-            for (const auto& pair : menu) {
-                std::cout << "Key: " << pair.first << std::endl;
-                word_info.byte = find_word_in_file(pair.first);
-                if (word_info.bits.error) goto terminate_with_errors;
-                if (word_info.bits.no_response) {
-                    std::cout << "No response from user" << std::endl;
-                    break;
-                }
-                if (word_info.bits.word_found){
-                    string text = "Você pediu " + pair.first;
-                    textToSpeech(text);
-                    goto terminate;
-                }
-            }
-            
-            textToSpeech("Não temos essa opção");
+            char c;
+            while (true) {
 
-            break;
-            
+                textToSpeech("Qual é o seu pedido?");
+                record_and_transcribe(6);
+                for (const auto& pair : menu) {
+                    std::cout << "Key: " << pair.first << std::endl;
+                    word_info.byte = find_word_in_file(pair.first);
+                    if (word_info.bits.error) goto terminate_with_errors;
+                    if (word_info.bits.no_response) {
+                        std::cout << "No response from user" << std::endl;
+                        break;
+                    }
+                    if (word_info.bits.word_found){
+                        string text = "Você pediu " + pair.first;
+                        textToSpeech(text);
+                        goto terminate;
+                    }
+                }
+                
+                textToSpeech("Não temos essa opção");
+
+                break;
+            }
         }
     }
 
