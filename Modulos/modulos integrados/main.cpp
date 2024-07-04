@@ -147,7 +147,7 @@ const string RECORD_AUDIO_COMMAND =
 void pls_wait_message(std::atomic<bool>& runFlag) {
     while(runFlag){
         sem_wait(&semaphore);
-        textToSpeech("Por favor, aguarde alguns instantes.");
+        if(runFlag) textToSpeech("Por favor, aguarde alguns instantes.");
 
     }
 }

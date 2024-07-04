@@ -169,12 +169,12 @@ int main() {
     std::thread messageThread(pls_wait_message, std::ref(runFlag)); // Start the thread
 
     std::unordered_map<std::string, int> menu = {
-        {"hambúrguer", 1},
-        {"cheeseburger", 2},
-        {"coca", 3},
-        {"batata", 4},
-        {"combo 1", 5},
-        {"combo 2", 6}
+        {"hambúrguer", 15},
+        {"cheeseburger", 20},
+        {"coca", 6},
+        {"batata", 5},
+        {"combo 1", 20},
+        {"combo 2", 25}
     };
 
     wfi_t word_info;
