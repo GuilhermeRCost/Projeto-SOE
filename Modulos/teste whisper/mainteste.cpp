@@ -207,7 +207,7 @@ int main() {
                     if (word_info.bits.error) goto terminate_with_errors;
                     if (word_info.bits.no_response) {
                         std::cout << "No response from user" << std::endl;
-                        break;
+                        goto terminate_with_errors;
                     }
                     if (word_info.bits.word_found){
                         string text = "Você pediu " + pair.first;
