@@ -8,13 +8,15 @@
 #include <cctype> 
 #include <thread>
 #include <semaphore.h>
-#include <wiringPi.h>
+//#include <wiringPi.h>
 #include <bitset>
 #include <atomic>
+#include <unistd.h> 
 
 
 #define WHISPER_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/"
 #define MODELS_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/models/"
+#define AUDIOS_DIR "../Audio/"
 
 #define MAIN "~/Documents/SOE/whisper_repo/whisper.cpp/main"
 #define MODEL_BIN_FILE "ggml-base.bin"
@@ -127,7 +129,7 @@ void textToSpeech(std::string speech)
 
 void record_and_transcribe(int record_time){
 const string RECORD_AUDIO_COMMAND =  
-    "arecord -D " + string(RECORD_AUDIO_INPUT) +
+    string("arecord -D") /*+ string(RECORD_AUDIO_INPUT)*/ +
     " -f S16_LE -r 16000 -c 1 " +
     string(OUTPUT_WAV_FILE) +
     " -d " + std::to_string(record_time);
@@ -143,6 +145,11 @@ const string RECORD_AUDIO_COMMAND =
 
 }
 
+void playAudio(const string audio_file){
+    const string PLAY_AUDIO_COM = "aplay " + string(AUDIOS_DIR) + "\"" + audio_file + "\"";
+    system(PLAY_AUDIO_COM.c_str());
+}
+
 // Function that the thread will execute
 void pls_wait_message(std::atomic<bool>& runFlag) {
     while(runFlag){
@@ -152,17 +159,23 @@ void pls_wait_message(std::atomic<bool>& runFlag) {
     }
 }
 
+int digitalRead(int num) {
+    int userInput;
+    std::cout << "Enter an integer: ";
+    std::cin >> userInput;
+    return userInput;
+}
 
 int main() {
 
-    // Initialize WiringPi
-    if (wiringPiSetupGpio() == -1) {
-        printf("wiringPi setup failed\n");
-        return 1;
-    }
+    // // Initialize WiringPi
+    // if (wiringPiSetupGpio() == -1) {
+    //     printf("wiringPi setup failed\n");
+    //     return 1;
+    // }
 
-    // Set GPIO 17 as input
-    pinMode(17, INPUT);
+    // // Set GPIO 17 as input
+    // pinMode(17, INPUT);
 
     std::atomic<bool> runFlag(true);
     sem_init(&semaphore, 0, 0); // Initialize the semaphore with value 1
@@ -191,13 +204,14 @@ std::unordered_map<std::string, int> speechExceptions = {
 
     std::cout << "Aguardando entrada" << std::endl;
 
+    int someone;
     while (1) {
         // Read and print the value of GPIO 17
-        // int value = digitalRead(17);
+        int value = digitalRead(17);
 
         if(value == 1){
             string text = "Você pediu ";
-            textToSpeech("Olá, você dejesa fazer um pedido?");
+            playAudio("ola fzr pedido.WAV");
             record_and_transcribe(5);
             word_info.byte = find_word_in_file("não");
 
@@ -210,13 +224,13 @@ std::unordered_map<std::string, int> speechExceptions = {
                 goto terminate;
             else if (word_info.bits.no_response){
                 //realiza 3 leituras para conferir se ainda há alguem em frente
-                int someone = digitalRead(17);
+                someone = digitalRead(17);
                 sleep(1);
                 someone += digitalRead(17);
                 sleep(1);
                 someone += digitalRead(17);
                 if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
-                    goto terminate  
+                    goto terminate; 
             }
             
             char c;
@@ -243,7 +257,7 @@ std::unordered_map<std::string, int> speechExceptions = {
                         break;
                     }else if (word_info.bits.word_found){
                         text += pair.first + ", ";
-                        itens==;
+                        ++itens;
                         std::cout<< text <<std::endl;
                         //textToSpeech(text);
                         //goto terminate;
@@ -261,13 +275,13 @@ std::unordered_map<std::string, int> speechExceptions = {
 
     anyeone_in_front:
     //realiza 3 leituras para conferir se ainda há alguem em frente
-    int someone = digitalRead(17);
+    someone = digitalRead(17);
     sleep(1);
     someone += digitalRead(17);
     sleep(1);
     someone += digitalRead(17);
     if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
-        goto terminate    
+        goto terminate;    
 
     terminate:
     // Signal the thread to stop
