@@ -196,30 +196,27 @@ int main() {
             if (word_info.bits.word_found || word_info.bits.no_response) goto terminate;
             if (word_info.byte == 1) goto terminate_with_errors;
 
-            char c;
-            while (true) {
-
-                textToSpeech("Qual é o seu pedido?");
-                record_and_transcribe(6);
-                for (const auto& pair : menu) {
-                    std::cout << "Key: " << pair.first << std::endl;
-                    word_info.byte = find_word_in_file(pair.first);
-                    if (word_info.bits.error) goto terminate_with_errors;
-                    if (word_info.bits.no_response) {
-                        std::cout << "No response from user" << std::endl;
-                        break;
-                    }
-                    if (word_info.bits.word_found){
-                        string text = "Você pediu " + pair.first;
-                        textToSpeech(text);
-                        goto terminate;
-                    }
+            textToSpeech("Qual é o seu pedido?");
+            record_and_transcribe(6);
+            for (const auto& pair : menu) {
+                std::cout << "Key: " << pair.first << std::endl;
+                word_info.byte = find_word_in_file(pair.first);
+                if (word_info.bits.error) goto terminate_with_errors;
+                if (word_info.bits.no_response) {
+                    std::cout << "No response from user" << std::endl;
+                    break;
                 }
-                
-                textToSpeech("Não temos essa opção");
-
-                break;
+                if (word_info.bits.word_found){
+                    string text = "Você pediu " + pair.first;
+                    textToSpeech(text);
+                    goto terminate;
+                }
             }
+            
+            textToSpeech("Não temos essa opção");
+
+            break;
+            
         }
     }
 
