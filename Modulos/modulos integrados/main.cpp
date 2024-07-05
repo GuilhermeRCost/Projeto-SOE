@@ -8,13 +8,16 @@
 #include <cctype> 
 #include <thread>
 #include <semaphore.h>
-#include <wiringPi.h>
+//#include <wiringPi.h>
 #include <bitset>
 #include <atomic>
+#include <unistd.h> 
+#include <vector>
 
 
 #define WHISPER_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/"
 #define MODELS_DIR "~/Documents/SOE/whisper_repo/whisper.cpp/models/"
+#define AUDIOS_DIR "../Audio/"
 
 #define MAIN "~/Documents/SOE/whisper_repo/whisper.cpp/main"
 #define MODEL_BIN_FILE "ggml-base.bin"
@@ -27,7 +30,7 @@
 //#define RECORD_AUDIO "arecord -D plughw:3,0 -f S16_LE -r 16000 -c 1 output.wav -d 3"
 //#define TRANSCRIBE_AUDIO_WHISPER "~/Documents/SOE/whisper_repo/whisper.cpp/main -m ~/Documents/SOE/whisper_repo/whisper.cpp/models/ggml-base.bin -f output.wav -l pt --output-txt true -of output"
 
-using std::system, std::string;
+using std::system, std::string, std::vector;
 
 typedef union Word_file_info {
     struct {
@@ -143,41 +146,55 @@ const string RECORD_AUDIO_COMMAND =
 
 }
 
+void playAudio(const string audio_file){
+    const string PLAY_AUDIO_COM = "aplay " + string(AUDIOS_DIR) + "\"" + audio_file + "\"";
+    system(PLAY_AUDIO_COM.c_str());
+}
+
 // Function that the thread will execute
 void pls_wait_message(std::atomic<bool>& runFlag) {
     while(runFlag){
         sem_wait(&semaphore);
-        if(runFlag) textToSpeech("Por favor, aguarde alguns instantes.");
+        if(runFlag) playAudio("pf aguarde.wav");
 
     }
+}
+
+// Delete when presenting!!!!!
+int digitalRead(int num) {
+    int userInput;
+    std::cout << "Enter an integer: ";
+    std::cin >> userInput;
+    return userInput;
 }
 
 
 int main() {
 
     // Initialize WiringPi
-    if (wiringPiSetupGpio() == -1) {
-        printf("wiringPi setup failed\n");
-        return 1;
-    }
+//    if (wiringPiSetupGpio() == -1) {
+//        printf("wiringPi setup failed\n");
+//        return 1;
+//    }
 
     // Set GPIO 17 as input
-    pinMode(17, INPUT);
+//    pinMode(17, INPUT);
 
     std::atomic<bool> runFlag(true);
     sem_init(&semaphore, 0, 0); // Initialize the semaphore with value 1
     std::thread messageThread(pls_wait_message, std::ref(runFlag)); // Start the thread
 
-    std::unordered_map<std::string, int> menu = {
-        {"cadápio", 0},
-        {"hambúrguer", 1},
-        {"cheeseburger", 2},
-        {"coca", 3},
-        {"batata", 4},
-        {"combo 1", 5},
-        {"combo 2", 6}
+    std::unordered_map<string, int> menu = { // Item, price
+        {"cardápio", 0},
+        {"hambúrguer", 15},
+        {"cheeseburger", 20},
+        {"coca", 6},
+        {"guarana", 6},
+        {"batata", 5},
+        {"combo 1", 24},
+        {"combo 2", 26}
     };
-std::unordered_map<std::string, int> speechExceptions = {
+    std::unordered_map<std::string, int> speechExceptions = {
         {"Am burguer", 0},
         {"Um burguer", 1},
         {"burguer", 2},
@@ -191,14 +208,15 @@ std::unordered_map<std::string, int> speechExceptions = {
 
     std::cout << "Aguardando entrada" << std::endl;
 
+    int someone;
     while (1) {
         // Read and print the value of GPIO 17
-        // int value = digitalRead(17);
+        int value = digitalRead(17);
 
         if(value == 1){
             string text = "Você pediu ";
-            textToSpeech("Olá, você dejesa fazer um pedido?");
-            record_and_transcribe(5);
+            playAudio("ola fzr pedido.WAV");
+            record_and_transcribe(4);
             word_info.byte = find_word_in_file("não");
 
             std::bitset<8> x(word_info.byte);
@@ -207,67 +225,118 @@ std::unordered_map<std::string, int> speechExceptions = {
             if (word_info.byte == 1) 
                 goto terminate_with_errors;
             else if (word_info.bits.word_found == 1) 
-                goto terminate;
+                continue;
             else if (word_info.bits.no_response){
                 //realiza 3 leituras para conferir se ainda há alguem em frente
-                int someone = digitalRead(17);
+                someone = digitalRead(17);
                 sleep(1);
                 someone += digitalRead(17);
                 sleep(1);
                 someone += digitalRead(17);
                 if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
-                    goto terminate  
+                    continue;  
             }
             
-            char c;
-            while (true) {
-                int itens = 0;
-                textToSpeech("Qual é o seu pedido?");
-                record_and_transcribe(6);
+            //char c;
 
-                for (const auto& pair : menu) {
-                    std::cout << "Key: " << pair.first << std::endl;
-                    word_info.byte = find_word_in_file(pair.first);
+            playAudio("ouvir cardapio.WAV");
+            record_and_transcribe(4);
+            word_info.byte = find_word_in_file("sim");
+            if(word_info.bits.no_response) {
+                //realiza 3 leituras para conferir se ainda há alguem em frente
+                someone = digitalRead(17);
+                sleep(1);
+                someone += digitalRead(17);
+                sleep(1);
+                someone += digitalRead(17);
+                if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
+                    continue;  
+            }
 
-                    
-                    if (word_info.bits.error) goto terminate_with_errors;
-                    if (word_info.bits.no_response) {
+            if (word_info.bits.word_found == 1) playAudio("menu.WAV");
+            sleep(1);
+        
+        pedido:
+            vector<string> lista_pedidos;
+            lista_pedidos.clear();
+            int price = 0;
+            playAudio("qual pedido.WAV");
+            record_and_transcribe(7);
+
+            int itens = 0;
+            for (const auto& pair : menu) {
+                std::cout << "Key: " << pair.first << std::endl;
+                word_info.byte = find_word_in_file(pair.first);
+
+                
+                if (word_info.bits.error) goto terminate_with_errors;
+                if (word_info.bits.no_response) {
+                    //realiza 3 leituras para conferir se ainda há alguem em frente
+                    someone = digitalRead(17);
+                    sleep(1);
+                    someone += digitalRead(17);
+                    sleep(1);
+                    someone += digitalRead(17);
+                    if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
                         std::cout << "No response from user" << std::endl;
-                        break;
-                    }
-                    if (pair.second == 0 &&  word_info.bits.word_found)
-                    {
-                        textToSpeech("O nosso cardapio possui: ");
-                        textToSpeech("Hamburguer, X-burguer, batata-frita, cocacola e guarana.");
-                        textToSpeech("Também temos combo 1, com haburguer, batata e bebida, e combo 2, com x-burguer, batata e bebida");
-                        break;
-                    }else if (word_info.bits.word_found){
-                        text += pair.first + ", ";
-                        itens==;
-                        std::cout<< text <<std::endl;
-                        //textToSpeech(text);
-                        //goto terminate;
+                        continue;  
+                    goto pedido;
+                }
+                if (word_info.bits.word_found)
+                {
+                    if(pair.first == "hambúrguer") lista_pedidos.push_back("hamburguer");
+                    else if(pair.first == "combo 1") lista_pedidos.push_back("combo1");
+                    else if(pair.first == "combo 2") lista_pedidos.push_back("combo2");
+                    else lista_pedidos.push_back(pair.first);
+
+                    price += pair.second;
+
+                }
+            }
+            if (lista_pedidos.empty()){
+                playAudio("nao temos opcao.WAV");
+                playAudio("ouvir cardapio.WAV");
+                record_and_transcribe(4);
+                word_info.byte = find_word_in_file("sim");
+                if (word_info.bits.word_found) goto pedido;
+            }else{
+                for (const auto& pedido : lista_pedidos){
+                    if(pedido == "combo1" || pedido == "combo2"){
+                        playAudio("qual bebida.WAV");
+                        sleep(4);
                     }
                 }
-                if (itens > 0)
-                    textToSpeech(text);
-                else
-                    textToSpeech("Não temos essa opção");
-                break;
+
+                playAudio("vc escolheu.WAV");
+                for (const auto& pedido : lista_pedidos){
+                    string file = pedido + ".WAV";
+                    playAudio(file);
+                }
+
+                playAudio("mais alguma coisa.WAV");
+                record_and_transcribe(4);
+                word_info.byte = find_word_in_file("sim");
+                if (word_info.bits.word_found) goto pedido;
+
+                string valor = "O valor total foi de " + std::to_string(price) + "reais";
+                textToSpeech(valor);
+
+                playAudio("fechar pedido.WAV");
+                record_and_transcribe(4);
+                word_info.byte = find_word_in_file("não");
+                if (word_info.bits.word_found) continue;
+
+                playAudio("formas de pagamento.WAV");
+                sleep(5);
+
+                playAudio("ate mais.WAV");
             }
+                
+            break;
+            
         }
-    }
-
-
-    anyeone_in_front:
-    //realiza 3 leituras para conferir se ainda há alguem em frente
-    int someone = digitalRead(17);
-    sleep(1);
-    someone += digitalRead(17);
-    sleep(1);
-    someone += digitalRead(17);
-    if (someone <2) //Caso menos de 2 leituras tenha retornado HIGH, o sistema entende que a pessoa já saiu
-        goto terminate    
+    
+    }  
 
     terminate:
     // Signal the thread to stop
@@ -279,7 +348,7 @@ std::unordered_map<std::string, int> speechExceptions = {
     messageThread.join();
     sem_destroy(&semaphore);
 
-    textToSpeech("Obrigado por escolher nosso restaurante. Daqui a pouco sua comida estará pronta!");
+    //textToSpeech("Obrigado por escolher nosso restaurante. Daqui a pouco sua comida estará pronta!");
 
     std::cout << "Terminated with no errors" << std::endl;
     return 0;
@@ -299,4 +368,4 @@ std::unordered_map<std::string, int> speechExceptions = {
 
 }
 
-//-lwiringPi -pthread
+//g++ main.cpp -o main -lwiringPi -pthread
